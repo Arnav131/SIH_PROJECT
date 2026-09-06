@@ -10,7 +10,43 @@ models on-device, then fuses their detections into one road-anomaly overlay.
 - `model_training/` - YOLO training, evaluation, conversion, and reporting tools.
 - `model_training/models/` - shipped model checkpoints and ONNX exports.
 - `model_training/reports/` - validation, dataset, duplicate, evaluation, and model sanity reports.
+- `server/` - FastAPI receiver, live dashboard, and server-side reverse geocoding.
+- `docs/` - architecture, sensor/YOLO fusion, geocoding and migration notes.
 - `.github/modernize/` - GitHub modernization hook scripts.
+
+## Consolidated system
+
+The Android app is now a single application combining the YOLO camera detector with the
+UrbanSenseAI sensor engine. The camera remains the primary screen; accelerometer, gyroscope,
+GPS, shock detection and transmission status live in a right-hand slide-out panel.
+
+A YOLO detection and a physical jolt are correlated by time to produce a **road event** with a
+confirmation status - `VISUAL_ONLY`, `SUPPORTED` or `CONFIRMED`. The two confidences are never
+combined arithmetically; see `docs/SENSOR_YOLO_FUSION.md`. Cracks are never required to
+produce a shock. Events are reverse-geocoded to a street address server-side, where the Google
+key stays off the device (`docs/GOOGLE_GEOCODING.md`).
+
+### Running it
+
+```bash
+# 1. laptop receiver + dashboard
+cd server
+python -m venv .venv && .venv\Scripts\activate     # Windows
+pip install -r requirements.txt
+cp .env.example .env                                 # optional: add GOOGLE_MAPS_API_KEY
+python server.py                                     # prints the URL to type into the app
+
+# 2. dashboard
+#    http://localhost:8000
+
+# 3. Android app
+cd android_test
+gradlew :app:testDebugUnitTest :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+In the app: open the **SENSORS** panel, enter the receiver URL the server printed, press
+CONNECT then START. The camera runs regardless of whether the sensor link is up.
 
 The dataset is intentionally not committed. Put local training data under
 `model_training/data/` when reproducing the pipeline.

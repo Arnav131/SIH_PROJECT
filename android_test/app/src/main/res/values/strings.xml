@@ -1,4 +1,20 @@
 <resources>
     <string name="app_name">Road AI</string>
     <string name="title">ROAD ANOMALY DETECTION</string>
+
+    <!-- Sensor drawer -->
+    <string name="sensors_button">SENSORS ▸</string>
+    <string name="sensor_diagnostics">SENSOR DIAGNOSTICS</string>
+    <string name="hdr_connection">CONNECTION</string>
+    <string name="hdr_accel">ACCELEROMETER</string>
+    <string name="hdr_gyro">GYROSCOPE</string>
+    <string name="hdr_gps">GPS</string>
+    <string name="hdr_shock">SHOCK</string>
+    <string name="hdr_events">ROAD EVENTS</string>
+    <string name="hdr_transmission">TRANSMISSION</string>
+    <string name="hint_receiver">http://192.168.1.5:8000</string>
+    <string name="btn_connect">CONNECT</string>
+    <string name="btn_disconnect">DISCONNECT</string>
+    <string name="btn_start">START</string>
+    <string name="btn_stop">STOP</string>
 </resources>

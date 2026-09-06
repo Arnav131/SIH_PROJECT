@@ -3,4 +3,24 @@
         <item name="android:statusBarColor">#000000</item>
         <item name="android:windowBackground">#000000</item>
     </style>
+
+    <!-- Sensor drawer text styles, kept out of the layout so every readout matches. -->
+    <style name="SensorHeading">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">14dp</item>
+        <item name="android:textColor">#8FA3C4</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.12</item>
+    </style>
+
+    <style name="SensorValue">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:textColor">#E8EEFC</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
 </resources>

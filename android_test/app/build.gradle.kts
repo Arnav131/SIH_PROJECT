@@ -43,6 +43,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    // The migrated sensor unit tests touch android.util.Log / Build; without this they
+    // fail on "not mocked" rather than on anything real.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -56,6 +62,18 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Right-hand sensor drawer. DrawerLayout is a plain ViewGroup from androidx and
+    // does NOT require an AppCompat theme, so the existing platform Material theme and
+    // ComponentActivity are left untouched.
+    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
+
+    // Sensor engine, migrated from UrbanSenseAI.
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    testImplementation("junit:junit:4.13.2")
 
     // ONNX Runtime for Android.
     // crack_rdd2022.onnx is opset 19 / IR 9, which requires ORT >= 1.16.

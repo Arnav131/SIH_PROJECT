@@ -17,7 +17,24 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import android.content.Intent
+import android.os.Build
+import android.view.Gravity
+import android.widget.Toast
+import androidx.core.view.GravityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.roadai.androidtest.config.DetectionConfig
+import com.roadai.androidtest.fusion.ConfirmationStatus
+import com.roadai.androidtest.fusion.RoadEvent
+import com.roadai.androidtest.fusion.RoadEventConfirmation
+import com.roadai.androidtest.sensors.AppState
+import com.roadai.androidtest.sensors.CollectionService
+import com.roadai.androidtest.sensors.Gps
+import com.roadai.androidtest.sensors.UrbanEngine
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.roadai.androidtest.detection.DetectionType
 import com.roadai.androidtest.detection.PerceptionResult
 import com.roadai.androidtest.inference.InferenceScheduler
@@ -37,7 +54,10 @@ import java.util.concurrent.Executors
  * This activity knows nothing about ONNX, class indices, or which model found
  * what. Adding a third specialist does not change this file.
  *
- * No IMU, GPS, networking or persistence — those come later.
+ * The sensor engine migrated from UrbanSenseAI runs ALONGSIDE this, never inside it:
+ * it owns the accelerometer, gyroscope, GPS, WebSocket and session, and publishes shocks.
+ * This activity correlates those shocks with what the camera saw and emits road events.
+ * There is exactly one camera in this app and it is the one bound below.
  */
 class MainActivity : ComponentActivity() {
 
@@ -51,6 +71,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var analysisExecutor: ExecutorService
 
     private var config = DetectionConfig.DEFAULT
+
+    /** Visual + physical corroboration. Separate from DetectionFusionEngine by design. */
+    private val confirmation = RoadEventConfirmation()
 
     // Rolling FPS accounting, so the panel reports measured rates rather than
     // the configured target.
@@ -81,6 +104,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    /**
+     * Location and notifications are requested separately from CAMERA so a refusal
+     * degrades the sensor side only — the detector keeps working without them.
+     */
+    private val requestSensorPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            UrbanEngine.startPreview()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -104,6 +136,11 @@ class MainActivity : ComponentActivity() {
             override fun onStartTrackingTouch(sb: SeekBar?) = Unit
             override fun onStopTrackingTouch(sb: SeekBar?) = Unit
         })
+
+        UrbanEngine.initialize(this)
+        wireSensorDrawer()
+        observeSensorState()
+        requestSensorPermissions.launch(sensorPermissions())
 
         loadModels()
 
@@ -196,6 +233,12 @@ class MainActivity : ComponentActivity() {
 
         var upright: Bitmap? = null
         try {
+            // Stamped BEFORE inference. On this device a cycle takes ~3.5 s, so a
+            // detection's own timestamp trails the physical moment by seconds and is
+            // useless for correlation. Everything downstream anchors on this instead.
+            val frameCapturedAtMs = System.currentTimeMillis()
+            val gpsAtCapture: Gps = UrbanEngine.state.value.gps
+
             val raw = proxy.toBitmap()
             upright = rotate(raw, proxy.imageInfo.rotationDegrees)
 
@@ -203,9 +246,18 @@ class MainActivity : ComponentActivity() {
             framesProcessed++
             updateRates()
 
+            val events = confirmation.evaluate(
+                result = result,
+                frameCapturedAtMs = frameCapturedAtMs,
+                shock = UrbanEngine.lastShock,
+                gps = gpsAtCapture
+            )
+            events.forEach { transmit(it) }
+
             runOnUiThread {
                 binding.overlayView.setResult(result)
                 setStatus(describe(result))
+                events.lastOrNull()?.let { showEventBanner(it) }
             }
         } catch (t: Throwable) {
             Log.e(TAG, "Perception cycle failed", t)
@@ -215,6 +267,136 @@ class MainActivity : ComponentActivity() {
             s.release()
             proxy.close()
         }
+    }
+
+    /** Hands a decided road event to the sensor engine's existing transport. */
+    private fun transmit(e: RoadEvent) {
+        UrbanEngine.submitRoadEvent(
+            eventId = e.eventId,
+            eventType = e.type.name,
+            visualConfidence = e.visualConfidence,
+            confirmationStatus = e.status.name,
+            sensorSupport = e.sensorSupport.name,
+            detectionLabel = e.label,
+            shock = e.shock,
+            correlationDeltaMs = e.correlationDeltaMs,
+            latitude = e.latitude,
+            longitude = e.longitude,
+            gpsAccuracy = e.gpsAccuracy,
+            frameCapturedAtMs = e.frameCapturedAtMs
+        )
+    }
+
+    private fun showEventBanner(e: RoadEvent) {
+        val where = if (e.hasLocation) "%.6f, %.6f".format(e.latitude, e.longitude) else "no fix"
+        val support = when (e.status) {
+            ConfirmationStatus.CONFIRMED -> "CONFIRMED by IMU (%.1fx baseline)".format(e.shock?.score ?: 0f)
+            ConfirmationStatus.SUPPORTED -> "SUPPORTED by IMU"
+            ConfirmationStatus.VISUAL_ONLY -> "VISUAL ONLY"
+        }
+        binding.eventBanner.text =
+            "${e.label.uppercase()}  %.2f\n$support\n$where".format(e.visualConfidence)
+        binding.eventBanner.visibility = android.view.View.VISIBLE
+        binding.eventBanner.removeCallbacks(hideBanner)
+        binding.eventBanner.postDelayed(hideBanner, 6_000)
+    }
+
+    private val hideBanner = Runnable {
+        binding.eventBanner.visibility = android.view.View.GONE
+    }
+
+    private fun sensorPermissions(): Array<String> {
+        val wanted = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            wanted += Manifest.permission.POST_NOTIFICATIONS
+        }
+        return wanted.toTypedArray()
+    }
+
+    private fun wireSensorDrawer() {
+        val prefs = getSharedPreferences("roadai", MODE_PRIVATE)
+        binding.receiverUrl.setText(prefs.getString("receiver", ""))
+
+        binding.sensorsButton.setOnClickListener {
+            if (binding.drawerLayout.isDrawerOpen(GravityCompat.END)) {
+                binding.drawerLayout.closeDrawer(GravityCompat.END)
+            } else {
+                binding.drawerLayout.openDrawer(GravityCompat.END)
+            }
+        }
+
+        binding.connectButton.setOnClickListener {
+            val url = binding.receiverUrl.text.toString()
+            val r = UrbanEngine.configure(url, "", "urbansenseai_demo_token")
+            if (r.isFailure) {
+                Toast.makeText(this, r.exceptionOrNull()?.message, Toast.LENGTH_LONG).show()
+            } else {
+                prefs.edit().putString("receiver", url).apply()
+                UrbanEngine.connect()
+            }
+        }
+        binding.disconnectButton.setOnClickListener { UrbanEngine.disconnect() }
+
+        binding.startButton.setOnClickListener {
+            val url = binding.receiverUrl.text.toString()
+            val r = UrbanEngine.configure(url, "", "urbansenseai_demo_token")
+            if (r.isFailure) {
+                Toast.makeText(this, r.exceptionOrNull()?.message, Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            prefs.edit().putString("receiver", url).apply()
+            // The service only keeps the process alive; a failure there must not take
+            // collection down with it, so the engine starts either way.
+            try {
+                ContextCompat.startForegroundService(this, Intent(this, CollectionService::class.java))
+            } catch (t: Throwable) {
+                Log.w(TAG, "foreground service unavailable", t)
+            }
+            confirmation.reset()
+            UrbanEngine.start()
+        }
+        binding.stopButton.setOnClickListener {
+            UrbanEngine.stop()
+            stopService(Intent(this, CollectionService::class.java))
+        }
+    }
+
+    /**
+     * StateFlow is already conflated, so a plain collect with a small pause renders the
+     * newest sample at a readable rate. collectLatest would cancel each render before the
+     * main thread could run it once the sensors emit at 20 Hz.
+     */
+    private fun observeSensorState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                UrbanEngine.state.collect { st ->
+                    renderSensors(st)
+                    delay(200)
+                }
+            }
+        }
+    }
+
+    private fun renderSensors(s: AppState) {
+        binding.connectionValue.text = "● ${s.connection}\n${s.wsUrl.ifBlank { "no receiver set" }}"
+        binding.accelValue.text = "X %+.3f\nY %+.3f\nZ %+.3f\n%s"
+            .format(s.accel.x, s.accel.y, s.accel.z, if (s.accel.available) "available" else "unavailable")
+        binding.gyroValue.text = "X %+.3f\nY %+.3f\nZ %+.3f\n%s"
+            .format(s.gyro.x, s.gyro.y, s.gyro.z, if (s.gyro.available) "available" else "unavailable")
+        binding.gpsValue.text = if (s.gps.active) {
+            "Lat %.6f\nLon %.6f\nAlt %.1f m\n± %.1f m (%s)"
+                .format(s.gps.latitude, s.gps.longitude, s.gps.altitude, s.gps.accuracy, s.gps.provider)
+        } else if (s.gps.enabled) "waiting for first fix…" else "unavailable / disabled"
+        binding.shockValue.text = "Score %.1f\nEvents %d\nLast %s"
+            .format(s.shockScore, s.events, s.lastEvent.ifBlank { "none" })
+        binding.roadEventValue.text = "Transmitted ${s.roadEventCount}"
+        binding.transmissionValue.text =
+            "Packets ${s.sent}\nAccel ${s.accelCount}  Gyro ${s.gyroCount}\nGPS ${s.gpsCount}\n" +
+                "Buffered ${s.buffered}\nLast ${s.lastSent.ifBlank { "-" }}"
+        binding.warningValue.text = s.warning
     }
 
     /** Builds the status panel text. Model filenames stay out of the UI. */
@@ -266,6 +448,16 @@ class MainActivity : ComponentActivity() {
 
     private fun setStatus(text: String) {
         binding.statusText.text = text
+    }
+
+    @Deprecated("Back handling kept simple; the drawer must close before the activity finishes.")
+    override fun onBackPressed() {
+        if (binding.drawerLayout.isDrawerOpen(GravityCompat.END)) {
+            binding.drawerLayout.closeDrawer(GravityCompat.END)
+        } else {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {

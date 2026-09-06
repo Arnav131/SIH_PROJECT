@@ -34,3 +34,8 @@ model_training/data/
 model_training/runs/
 wandb/
 mlruns/
+
+# Consolidated receiver (server/)
+server/data/
+server/.venv/
+server/tests/testdata_*/
