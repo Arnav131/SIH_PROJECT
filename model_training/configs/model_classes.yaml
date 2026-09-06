@@ -1,0 +1,126 @@
+# ==========================================================================
+# DEPLOYED MODEL — class taxonomy and inference contract
+# ==========================================================================
+#
+# This file describes the model that ships (models/best.pt, models/best.onnx).
+# Every value below was read directly out of the model files by
+# scripts/verify_model_contract.py — none of it is assumed.
+#
+# >>> THIS, NOT configs/data.yaml, IS THE SOURCE OF TRUTH FOR INFERENCE <<<
+#
+# configs/data.yaml describes the LOCAL 6-class dataset in
+# data/processed/road_damage_combined/ (built from the three Kaggle datasets).
+# The shipped model was trained separately, on RDD2022, and has a DIFFERENT
+# 5-class taxonomy. The two are not interchangeable:
+#
+#     data.yaml    : 6 classes, pothole = 0
+#     this model   : 5 classes, Pothole = 3
+#
+# Wiring data.yaml's class order into the Android app would mislabel every
+# detection. Use the mapping below, or read names from the model metadata at
+# runtime (both .pt and .onnx embed it).
+#
+# Full validation record: reports/model_sanity_check.md
+# ==========================================================================
+
+model:
+  pt_file: models/best.pt
+  onnx_file: models/best.onnx
+  architecture: YOLOv8s
+  parameters: 11137535
+  trained_on: RDD2022 (config named data_rdd.yaml)
+  trained_where: Kaggle — runs/train_kaggle/improved_model
+  epoch: 75
+  ultralytics_version_pt: 8.4.71
+  ultralytics_version_onnx_export: 8.4.12
+
+# Metrics as recorded in the checkpoint, measured on the model's OWN
+# RDD2022 validation split — NOT on this repo's local dataset.
+metrics:
+  precision: 0.662
+  recall: 0.583
+  mAP50: 0.629
+  mAP50-95: 0.345
+
+# --------------------------------------------------------------------------
+# Class mapping — read from model.names / ONNX metadata_props.
+# Identical in the .pt and the .onnx, so the export preserved it correctly.
+# --------------------------------------------------------------------------
+nc: 5
+
+names:
+  0: Longitudinal Crack
+  1: Transverse Crack
+  2: Alligator Crack
+  3: Pothole
+  4: Other
+
+# RDD2022 damage codes these correspond to, for reference when reading
+# RDD literature or re-training on that dataset.
+rdd2022_codes:
+  0: D00
+  1: D10
+  2: D20
+  3: D40
+  4: Other
+
+# --------------------------------------------------------------------------
+# ONNX inference contract — what an Android integration must implement.
+# --------------------------------------------------------------------------
+onnx:
+  ir_version: 9
+  opset: 19
+  producer: pytorch 2.5.1
+  size_mb: 44.8
+  min_onnxruntime: "1.16"        # opset 19 requires ORT >= 1.16; use 1.17+ AAR
+
+  input:
+    name: images
+    shape: [1, 3, 640, 640]      # STATIC — batch fixed at 1, size fixed at 640
+    dtype: float32
+    layout: NCHW
+
+  output:
+    name: output0
+    shape: [1, 9, 8400]          # 9 = 4 bbox terms + 5 class scores
+    dtype: float32
+    layout: channels_first        # transpose to [8400, 9] before decoding
+
+  preprocessing:
+    color: BGR_to_RGB
+    resize: letterbox_to_640x640
+    pad_value: 114
+    scale: divide_by_255
+    normalization: none           # NO ImageNet mean/std subtraction
+    transpose: HWC_to_CHW
+
+  postprocessing:
+    box_format: cxcywh            # centre-x, centre-y, width, height
+    box_space: pixels_640         # in 640x640 letterbox space, NOT normalized
+    box_steps:
+      - transpose output to [8400, 9]
+      - "columns 0-3 = cxcywh, columns 4-8 = per-class scores"
+      - scores are already sigmoid-activated — no extra activation
+      - "confidence = max(scores), class_id = argmax(scores)"
+      - convert cxcywh to xyxy
+      - apply NMS
+      - un-letterbox back to original image coordinates (undo scale + both pad offsets)
+    nms_required: true            # NMS is NOT in the graph — verified by op scan
+    nms_in_graph: false
+    end2end: false
+    suggested_conf: 0.25
+    suggested_iou: 0.7
+
+# --------------------------------------------------------------------------
+# Known deployment considerations — see reports/model_sanity_check.md §6, §8
+# --------------------------------------------------------------------------
+notes:
+  - 44.8 MB float32 is heavy for an APK and for real-time mobile inference.
+    Consider INT8/FP16 quantization from the .pt, then re-validate — do not
+    quantize blindly.
+  - Static 640x640 input: the camera pipeline must letterbox to exactly this.
+  - Un-letterboxing is the most common cause of misplaced boxes in mobile
+    ports; carry scale and both pad offsets through.
+  - This model detects RDD2022-style damage. On this repo's local 6-class
+    test images it fires mostly "Other" and crack classes and rarely
+    "Pothole" — expected, since that data is a different domain and taxonomy.

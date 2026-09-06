@@ -1,0 +1,12 @@
+path: D:\ML_PROJECTS\SIH\road_damage_ai\data\processed\road_damage_combined
+train: images/train
+val: images/val
+test: images/test
+nc: 6
+names:
+  0: pothole
+  1: crack
+  2: manhole
+  3: road_damage
+  4: speed_bump
+  5: unsurfaced_road

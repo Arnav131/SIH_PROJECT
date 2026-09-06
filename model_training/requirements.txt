@@ -1,0 +1,31 @@
+# Road Damage AI - Requirements
+# Core ML
+ultralytics>=8.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Image processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Data handling
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+
+# Configuration
+PyYAML>=6.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Duplicate detection
+imagehash>=4.3.0
+
+# Progress bars
+tqdm>=4.65.0
+
+# Utilities
+pathlib2>=2.3.0;python_version<"3.4"
+psutil>=5.9.0
