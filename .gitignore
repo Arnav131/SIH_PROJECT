@@ -1,0 +1,36 @@
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local machine configuration
+local.properties
+*.local
+.env
+.env.*
+
+# Python caches/environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# Android/Gradle generated files
+.gradle/
+**/.gradle/
+**/build/
+*.apk
+*.aab
+
+# ML experiment/run outputs
+model_training/data/
+model_training/runs/
+wandb/
+mlruns/

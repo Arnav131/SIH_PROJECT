@@ -1,0 +1,137 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyResearch - Pothole Detection Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+        }
+        .header {
+            background-color: #0055FF;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .dashboard-container {
+            max-width: 1280px;
+            margin: 30px auto;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .video-container {
+            flex: 2;
+            min-width: 300px;
+        }
+        .video-feed {
+            width: 100%;
+            border: 3px solid #0055FF;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .stats-panel {
+            flex: 1;
+            min-width: 300px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border: 1px solid #0055FF;
+        }
+        .stats-panel h2 {
+            color: #0055FF;
+            margin: 0 0 15px 0;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #0055FF;
+            padding-bottom: 5px;
+        }
+        .stats-item {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .stats-item strong {
+            color: #333;
+        }
+        .footer {
+            background-color: #0055FF;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>PyResearch - Pothole Detection System</h1>
+        <p>Advanced Computer Vision Analysis</p>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard-container">
+        <!-- Video Feed -->
+        <div class="video-container">
+            <img src="{{ url_for('video_feed') }}" class="video-feed" alt="Video Feed">
+        </div>
+
+        <!-- Analysis Statistics Panel -->
+        <div class="stats-panel">
+            <h2>Analysis Statistics</h2>
+            <div class="stats-item">
+                <strong>Model:</strong> YOLOv12
+            </div>
+            <div class="stats-item">
+                <strong>Status:</strong> Running
+            </div>
+            <div class="stats-item">
+                <strong>Frame Rate:</strong> Calculating...
+            </div>
+            <div class="stats-item">
+                <strong>Detections:</strong> <span id="detection-count">0</span>
+            </div>
+            <div class="stats-item">
+                <strong>Confidence Threshold:</strong> 0.7
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>© 2025 PyResearch. All rights reserved.</p>
+        <p>Powered by PyResearch Technology</p>
+    </div>
+
+    <!-- JavaScript to Update Detection Count -->
+    <script>
+        function updateDetectionCount() {
+            fetch('/detection_count')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('detection-count').innerText = data.detections;
+                })
+                .catch(error => console.error('Error fetching detection count:', error));
+        }
+
+        // Update detection count every second
+        setInterval(updateDetectionCount, 1000);
+
+        // Initial update
+        updateDetectionCount();
+    </script>
+</body>
+</html>

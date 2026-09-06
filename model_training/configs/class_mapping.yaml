@@ -1,0 +1,130 @@
+# =========================================================
+# Class Mapping Configuration
+# Road Damage AI Pipeline
+# =========================================================
+#
+# Maps original dataset class IDs to the unified final taxonomy.
+#
+# Final Taxonomy:
+#   0 = pothole
+#   1 = crack
+#   2 = manhole
+#   3 = road_damage
+#   4 = speed_bump
+#   5 = unsurfaced_road
+# =========================================================
+
+# ─────────────────────────────────────────────────────────
+# Dataset 1: RAD (Road Anomaly Detection)
+# Original classes: HMV, LMV, Pedestrian, RoadDamages, SpeedBump, UnsurfacedRoad
+# ─────────────────────────────────────────────────────────
+rad:
+  source_name: "RAD - Road Anomaly Detection"
+  source_url: "https://www.kaggle.com/datasets/rohitsuresh15/radroad-anomaly-detection"
+  original_classes:
+    0:
+      original_name: "HMV"
+      action: "exclude"
+      reason: "Heavy Motor Vehicle - not road damage relevant"
+    1:
+      original_name: "LMV"
+      action: "exclude"
+      reason: "Light Motor Vehicle - not road damage relevant"
+    2:
+      original_name: "Pedestrian"
+      action: "exclude"
+      reason: "Pedestrian detection - not road damage relevant"
+    3:
+      original_name: "RoadDamages"
+      action: "map"
+      final_class_id: 3
+      final_class_name: "road_damage"
+      reason: "Generic undifferentiated road damage - cannot split into pothole/crack"
+    4:
+      original_name: "SpeedBump"
+      action: "map"
+      final_class_id: 4
+      final_class_name: "speed_bump"
+      reason: "Speed bump detection useful for road intelligence"
+    5:
+      original_name: "UnsurfacedRoad"
+      action: "map"
+      final_class_id: 5
+      final_class_name: "unsurfaced_road"
+      reason: "Unsurfaced road detection useful for road condition assessment"
+
+  # Classes to exclude (vehicle and pedestrian)
+  exclude_class_ids: [0, 1, 2]
+
+  # Mapping from original class ID to final class ID
+  class_map:
+    3: 3   # RoadDamages -> road_damage
+    4: 4   # SpeedBump -> speed_bump
+    5: 5   # UnsurfacedRoad -> unsurfaced_road
+
+# ─────────────────────────────────────────────────────────
+# Dataset 2: Road Damage Dataset (Potholes, Cracks, Manholes)
+# Original classes: Pothole, Crack, Manhole
+# ─────────────────────────────────────────────────────────
+road_damage:
+  source_name: "Road Damage Dataset: Potholes, Cracks and Manholes"
+  source_url: "https://www.kaggle.com/datasets/lorenzoarcioni/road-damage-dataset-potholes-cracks-and-manholes/data"
+  original_classes:
+    0:
+      original_name: "Pothole"
+      action: "map"
+      final_class_id: 0
+      final_class_name: "pothole"
+      reason: "Direct semantic match"
+    1:
+      original_name: "Crack"
+      action: "map"
+      final_class_id: 1
+      final_class_name: "crack"
+      reason: "Direct semantic match"
+    2:
+      original_name: "Manhole"
+      action: "map"
+      final_class_id: 2
+      final_class_name: "manhole"
+      reason: "Direct semantic match"
+
+  exclude_class_ids: []
+
+  class_map:
+    0: 0   # Pothole -> pothole
+    1: 1   # Crack -> crack
+    2: 2   # Manhole -> manhole
+
+# ─────────────────────────────────────────────────────────
+# Dataset 3: Pothole Detection Dataset (YOLOv11 Optimized)
+# Original classes: pothole
+# ─────────────────────────────────────────────────────────
+pothole_dataset:
+  source_name: "Pothole Detection Dataset 3900+ / YOLOv11 Optimized"
+  source_url: "https://www.kaggle.com/datasets/muskanverma24/pothole-detection-dataset-yolov11-optimized"
+  original_classes:
+    0:
+      original_name: "pothole"
+      action: "map"
+      final_class_id: 0
+      final_class_name: "pothole"
+      reason: "Direct semantic match"
+
+  exclude_class_ids: []
+
+  class_map:
+    0: 0   # pothole -> pothole
+
+# ─────────────────────────────────────────────────────────
+# Final unified taxonomy
+# ─────────────────────────────────────────────────────────
+final_taxonomy:
+  num_classes: 6
+  classes:
+    0: "pothole"
+    1: "crack"
+    2: "manhole"
+    3: "road_damage"
+    4: "speed_bump"
+    5: "unsurfaced_road"
