@@ -2,6 +2,7 @@
 **/build/
 local.properties
 .idea/
+android-app/.claude/
 server/.env
 server/data/
 *.pyc
