@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/UrbanSense/UrbanSenseV2 && find android-app/app -type f \\\\\\( -name \"*.kt\" -o -name \"*.java\" -o -name \"*.xml\" -o -name \"*.gradle\" -o -name \"*.pro\" \\\\\\) -not -path \"*/build/*\" | sort && echo \"=== SERVER ===\" && find server -type f -not -path \"*/node_modules/*\" -not -path \"*/.venv/*\" -not -path \"*/__pycache__/*\" | head -50)"
+    ]
+  }
+}

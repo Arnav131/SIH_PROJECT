@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanSenseAI Dashboard</title>
+<style>
+ :root{
+  --bg:#0d1220; --card:#161f33; --edge:#243149; --ink:#e8eefc; --dim:#8fa3c4;
+  --accent:#70d6ff; --ok:#65e580; --warn:#ffc857; --bad:#ff6b6b;
+  --x:#ff7a7a; --y:#7ce38b; --z:#7ab8ff;
+ }
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--bg);color:var(--ink);
+      font:15px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
+ header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;
+        padding:18px 24px;border-bottom:1px solid var(--edge);background:#111829;
+        position:sticky;top:0;z-index:5}
+ h1{margin:0;font-size:20px;letter-spacing:.4px}
+ h1 span{color:var(--accent)}
+ .pills{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px}
+ .pill{display:flex;align-items:center;gap:7px;background:#0f1626;border:1px solid var(--edge);
+       border-radius:999px;padding:6px 13px;color:var(--dim);white-space:nowrap}
+ .pill b{color:var(--ink);font-weight:600}
+ .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);flex:none}
+ .dot.live{background:var(--ok);box-shadow:0 0 0 0 rgba(101,229,128,.6);animation:pulse 1.6s infinite}
+ .dot.wait{background:var(--warn)}
+ @keyframes pulse{70%{box-shadow:0 0 0 7px rgba(101,229,128,0)}100%{box-shadow:0 0 0 0 rgba(101,229,128,0)}}
+ main{padding:22px 24px 40px;display:grid;gap:18px;
+      grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:1500px;margin:0 auto}
+ .card{background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:18px 20px;min-width:0}
+ .card h2{margin:0 0 14px;font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);font-weight:600}
+ .wide{grid-column:1/-1}
+ .axes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+ .axis{background:#101728;border-radius:10px;padding:11px 10px;border-left:3px solid var(--edge);min-width:0}
+ .axis.x{border-left-color:var(--x)} .axis.y{border-left-color:var(--y)} .axis.z{border-left-color:var(--z)}
+ .axis .k{font-size:11px;color:var(--dim);letter-spacing:1.2px}
+ /* A negative three-decimal reading is wide; without nowrap plus a fluid size it split
+    mid-number ("-4.92" / "7") on a narrow window, which reads as a different value. */
+ .axis .v{font-size:clamp(14px,1.7vw,23px);font-weight:600;font-variant-numeric:tabular-nums;
+          font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;
+          white-space:nowrap;overflow:hidden}
+ .unit{font-size:11px;color:var(--dim);margin-top:10px}
+ .rows{display:grid;gap:9px}
+ .row{display:flex;justify-content:space-between;gap:14px;align-items:baseline;
+      border-bottom:1px dashed #22304a;padding-bottom:8px}
+ .row:last-child{border-bottom:0;padding-bottom:0}
+ .row span{color:var(--dim);font-size:13px}
+ .row b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;
+        font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;text-align:right}
+ .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+ .tile{background:#101728;border-radius:10px;padding:13px 15px}
+ .tile .k{font-size:11px;color:var(--dim);letter-spacing:1.1px;text-transform:uppercase}
+ .tile .v{font-size:clamp(17px,1.9vw,26px);font-weight:600;color:var(--accent);
+          font-variant-numeric:tabular-nums;white-space:nowrap;
+          font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+ canvas{width:100%;height:170px;display:block;background:#0c1322;border-radius:10px}
+ .legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:9px}
+ .legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+ .frame{width:100%;border-radius:10px;background:#0c1322;display:block;aspect-ratio:4/3;object-fit:contain}
+ .muted{color:var(--dim);font-size:13px}
+ .bar{height:5px;background:#0c1322;border-radius:3px;overflow:hidden;margin-top:8px}
+ .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .15s linear}
+ a.btn{display:inline-block;margin-top:12px;color:var(--accent);text-decoration:none;font-size:13px;
+       border:1px solid var(--edge);border-radius:8px;padding:7px 13px}
+ a.btn:hover{background:#0f1626}
+ .events{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+ .event{background:#101728;border:1px solid var(--edge);border-radius:10px;overflow:hidden}
+ .event img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#0c1322}
+ .event .meta{padding:10px 12px;font-size:12px;color:var(--dim);line-height:1.6}
+ .event .meta b{color:var(--ink);font-variant-numeric:tabular-nums;
+                font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+ .event a{color:var(--accent);text-decoration:none}
+ .event a:hover{text-decoration:underline}
+ .badge{display:inline-block;font-size:10px;letter-spacing:1px;text-transform:uppercase;
+        padding:3px 8px;border-radius:999px;font-weight:700;margin-bottom:7px}
+ .badge.shock{background:rgba(255,107,107,.18);color:#ff9b9b;border:1px solid rgba(255,107,107,.4)}
+ .badge.sustained{background:rgba(255,200,87,.18);color:var(--warn);border:1px solid rgba(255,200,87,.45)}
+ .badge.manual{background:rgba(112,214,255,.14);color:var(--accent);border:1px solid rgba(112,214,255,.35)}
+ #log{font:12px/1.6 ui-monospace,"Cascadia Mono",Consolas,monospace;color:var(--dim);
+      max-height:190px;overflow:auto;background:#0c1322;border-radius:10px;padding:12px}
+ #log div{white-space:pre;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+
+<header>
+ <h1>Urban<span>Sense</span>AI</h1>
+ <div class="pills">
+  <div class="pill"><i class="dot" id="dotServer"></i>Receiver <b id="server">connecting…</b></div>
+  <div class="pill"><i class="dot" id="dotDevice"></i>Device <b id="device">none</b></div>
+  <div class="pill">Session <b id="session">—</b></div>
+  <div class="pill">Last packet <b id="age">—</b></div>
+ </div>
+</header>
+
+<main>
+
+ <section class="card wide">
+  <h2>Throughput</h2>
+  <div class="tiles">
+   <div class="tile"><div class="k">Packets</div><div class="v" id="packets">0</div></div>
+   <div class="tile"><div class="k">Rate</div><div class="v" id="rate">0.0 Hz</div></div>
+   <div class="tile"><div class="k">Accelerometer</div><div class="v" id="cAccel">0</div></div>
+   <div class="tile"><div class="k">Gyroscope</div><div class="v" id="cGyro">0</div></div>
+   <div class="tile"><div class="k">GPS</div><div class="v" id="cGps">0</div></div>
+   <div class="tile"><div class="k">Camera</div><div class="v" id="cCam">0</div></div>
+   <div class="tile"><div class="k">Shock events</div><div class="v" id="cEvt">0</div></div>
+  </div>
+ </section>
+
+ <section class="card">
+  <h2>Accelerometer</h2>
+  <div class="axes">
+   <div class="axis x"><div class="k">X</div><div class="v" id="ax">0.000</div></div>
+   <div class="axis y"><div class="k">Y</div><div class="v" id="ay">0.000</div></div>
+   <div class="axis z"><div class="k">Z</div><div class="v" id="az">0.000</div></div>
+  </div>
+  <div class="unit">metres per second squared · magnitude <b id="amag">0.00</b></div>
+  <div class="bar"><i id="abar"></i></div>
+ </section>
+
+ <section class="card">
+  <h2>Gyroscope</h2>
+  <div class="axes">
+   <div class="axis x"><div class="k">X</div><div class="v" id="gx">0.000</div></div>
+   <div class="axis y"><div class="k">Y</div><div class="v" id="gy">0.000</div></div>
+   <div class="axis z"><div class="k">Z</div><div class="v" id="gz">0.000</div></div>
+  </div>
+  <div class="unit">radians per second · magnitude <b id="gmag">0.00</b></div>
+  <div class="bar"><i id="gbar"></i></div>
+ </section>
+
+ <section class="card">
+  <h2>GPS</h2>
+  <div class="rows">
+   <div class="row"><span>Latitude</span><b id="lat">—</b></div>
+   <div class="row"><span>Longitude</span><b id="lon">—</b></div>
+   <div class="row"><span>Altitude</span><b id="alt">—</b></div>
+   <div class="row"><span>Speed</span><b id="spd">—</b></div>
+   <div class="row"><span>Bearing</span><b id="brg">—</b></div>
+   <div class="row"><span>Accuracy</span><b id="acc">—</b></div>
+  </div>
+  <a class="btn" id="mapLink" href="#" target="_blank" rel="noopener" hidden>Open in OpenStreetMap ↗</a>
+ </section>
+
+ <section class="card wide">
+  <h2>Accelerometer — last 300 samples</h2>
+  <canvas id="chartA"></canvas>
+  <div class="legend"><span><i style="background:var(--x)"></i>X</span><span><i style="background:var(--y)"></i>Y</span><span><i style="background:var(--z)"></i>Z</span></div>
+ </section>
+
+ <section class="card wide">
+  <h2>Gyroscope — last 300 samples</h2>
+  <canvas id="chartG"></canvas>
+  <div class="legend"><span><i style="background:var(--x)"></i>X</span><span><i style="background:var(--y)"></i>Y</span><span><i style="background:var(--z)"></i>Z</span></div>
+ </section>
+
+ <section class="card wide">
+  <h2>Shock events — auto-captured</h2>
+  <div class="events" id="events"></div>
+  <div class="muted" id="eventsEmpty">No shock events yet. A sharp, repeated jolt on the phone photographs itself and lands here with its coordinates.</div>
+ </section>
+
+ <section class="card">
+  <h2>Camera</h2>
+  <img class="frame" id="frame" alt="Latest captured frame" hidden>
+  <div class="unit" id="frameInfo">No frame captured yet — press CAPTURE on the phone.</div>
+ </section>
+
+ <section class="card">
+  <h2>Packet log</h2>
+  <div id="log"><div class="muted">waiting…</div></div>
+  <a class="btn" id="jsonLink" href="#" hidden>Download session JSON ↓</a>
+ </section>
+
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const CAP = 300;
+
+const series = {
+ accel: {x: [], y: [], z: []},
+ gyro:  {x: [], y: [], z: []}
+};
+let counts = {packets: 0, accelerometer: 0, gyroscope: 0, gps: 0, camera: 0};
+let recent = [];              // arrival timestamps, for the live rate
+let lastPacketAt = 0;
+let sessionId = "";
+let socket = null;
+let backoff = 1;
+
+function push(buf, v) { buf.push(v); if (buf.length > CAP) buf.shift(); }
+function fmt(n, d = 3) { return Number(n).toFixed(d); }
+
+function setDot(el, state) { el.className = "dot" + (state ? " " + state : ""); }
+
+/* ---------- rendering ---------------------------------------------------- */
+
+function renderAccel(d) {
+ $("ax").textContent = fmt(d.x); $("ay").textContent = fmt(d.y); $("az").textContent = fmt(d.z);
+ const m = Math.hypot(d.x, d.y, d.z);
+ $("amag").textContent = fmt(m, 2);
+ $("abar").style.width = Math.min(100, m / 20 * 100) + "%";
+ push(series.accel.x, d.x); push(series.accel.y, d.y); push(series.accel.z, d.z);
+}
+
+function renderGyro(d) {
+ $("gx").textContent = fmt(d.x); $("gy").textContent = fmt(d.y); $("gz").textContent = fmt(d.z);
+ const m = Math.hypot(d.x, d.y, d.z);
+ $("gmag").textContent = fmt(m, 2);
+ $("gbar").style.width = Math.min(100, m / 5 * 100) + "%";
+ push(series.gyro.x, d.x); push(series.gyro.y, d.y); push(series.gyro.z, d.z);
+}
+
+function renderGps(d) {
+ $("lat").textContent = Number(d.latitude).toFixed(6);
+ $("lon").textContent = Number(d.longitude).toFixed(6);
+ $("alt").textContent = fmt(d.altitude, 1) + " m";
+ $("spd").textContent = fmt(d.speed, 2) + " m/s";
+ $("brg").textContent = fmt(d.bearing, 1) + "°";
+ $("acc").textContent = "± " + fmt(d.accuracy, 1) + " m";
+ const link = $("mapLink");
+ link.href = `https://www.openstreetmap.org/?mlat=${d.latitude}&mlon=${d.longitude}#map=17/${d.latitude}/${d.longitude}`;
+ link.hidden = false;
+}
+
+function renderCounts() {
+ $("packets").textContent = counts.packets.toLocaleString();
+ $("cAccel").textContent = (counts.accelerometer || 0).toLocaleString();
+ $("cGyro").textContent = (counts.gyroscope || 0).toLocaleString();
+ $("cGps").textContent = (counts.gps || 0).toLocaleString();
+ $("cCam").textContent = (counts.camera || 0).toLocaleString();
+}
+
+function setSession(id) {
+ if (!id || id === sessionId) return;
+ sessionId = id;
+ $("session").textContent = id;
+ const link = $("jsonLink");
+ link.href = `/api/sessions/${encodeURIComponent(id)}/json`;
+ link.hidden = false;
+}
+
+function showFrame(f) {
+ if (!f || !f.filename) return;
+ const img = $("frame");
+ // A truncated capture would otherwise leave a silently broken image on the page.
+ img.onload = () => { img.hidden = false; };
+ img.onerror = () => { img.hidden = true; $("frameInfo").textContent = `${f.filename} could not be decoded`; };
+ img.src = "/api/latest-frame.jpg?t=" + f.received;
+ const trigger = f.trigger && f.trigger !== "manual" ? " · " + f.trigger.replace("_", " ") : "";
+ const place = (f.latitude != null && f.longitude != null)
+  ? " · " + Number(f.latitude).toFixed(5) + ", " + Number(f.longitude).toFixed(5) : "";
+ f = Object.assign({}, f, {_suffix: trigger + place});
+ const when = new Date(f.received).toLocaleTimeString([], {hour12: false});
+ const suffix = f._suffix || "";
+ $("frameInfo").textContent = (f.width
+  ? `${f.filename} · ${f.width}×${f.height} · ${when}`
+  : `${f.filename} · ${when}`) + suffix;
+}
+
+const seenEvents = new Set();
+
+function addEvent(e, prepend) {
+ const key = e.session_id + "/" + e.filename;
+ if (seenEvents.has(key)) return;
+ seenEvents.add(key);
+
+ const sustained = e.trigger === "shock_sustained";
+ const card = document.createElement("div");
+ card.className = "event";
+
+ const full = e.url || ("/api/sessions/" + encodeURIComponent(e.session_id) + "/images/" + encodeURIComponent(e.filename));
+ const img = document.createElement("img");
+ img.loading = "lazy";
+ img.alt = "Frame captured at " + new Date(e.received).toLocaleTimeString([], {hour12: false});
+ // The card shows a 480px copy; the link opens the capture at full size.
+ img.src = full + "?thumb=1";
+ img.onerror = () => { img.remove(); };
+ const open = document.createElement("a");
+ open.href = full;
+ open.target = "_blank";
+ open.rel = "noopener";
+ open.appendChild(img);
+ card.appendChild(open);
+
+ const meta = document.createElement("div");
+ meta.className = "meta";
+
+ const badge = document.createElement("span");
+ badge.className = "badge " + (sustained ? "sustained" : "shock");
+ badge.textContent = sustained ? "sustained" : "shock";
+ meta.appendChild(badge);
+
+ const when = document.createElement("div");
+ when.textContent = new Date(e.received).toLocaleTimeString([], {hour12: false});
+ meta.appendChild(when);
+
+ if (e.accel_magnitude != null) {
+  const force = document.createElement("div");
+  force.innerHTML = "jolt <b>" + Number(e.accel_magnitude).toFixed(1) + "</b> m/s²" +
+   (e.shock_score != null ? " · <b>" + Number(e.shock_score).toFixed(1) + "×</b> baseline" : "");
+  meta.appendChild(force);
+ }
+
+ if (e.latitude != null && e.longitude != null) {
+  const where = document.createElement("div");
+  where.innerHTML = "<b>" + Number(e.latitude).toFixed(6) + ", " + Number(e.longitude).toFixed(6) + "</b>" +
+   (e.gps_accuracy != null ? " ± " + Number(e.gps_accuracy).toFixed(0) + " m" : "");
+  meta.appendChild(where);
+  const link = document.createElement("a");
+  link.href = `https://www.openstreetmap.org/?mlat=${e.latitude}&mlon=${e.longitude}#map=18/${e.latitude}/${e.longitude}`;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "map ↗";
+  meta.appendChild(link);
+ } else {
+  const where = document.createElement("div");
+  where.textContent = "no fix at capture time";
+  meta.appendChild(where);
+ }
+
+ card.appendChild(meta);
+ const box = document.getElementById("events");
+ if (prepend) box.prepend(card); else box.appendChild(card);
+ while (box.childElementCount > 40) box.lastElementChild.remove();
+ document.getElementById("eventsEmpty").hidden = true;
+ $("cEvt").textContent = seenEvents.size.toLocaleString();
+}
+
+function logLine(text) {
+ const box = $("log");
+ if (box.firstElementChild && box.firstElementChild.className === "muted") box.innerHTML = "";
+ const row = document.createElement("div");
+ row.textContent = text;
+ box.prepend(row);
+ while (box.childElementCount > 60) box.lastElementChild.remove();
+}
+
+function describe(p) {
+ const t = new Date(p.timestamp).toLocaleTimeString([], {hour12: false});
+ const d = p.data || {};
+ if (p.type === "sensor") return `${t}  #${p.sequence_number}  ${p.sensor.padEnd(13)} x=${fmt(d.x)} y=${fmt(d.y)} z=${fmt(d.z)}`;
+ if (p.type === "gps")    return `${t}  #${p.sequence_number}  gps           lat=${Number(d.latitude).toFixed(6)} lon=${Number(d.longitude).toFixed(6)}`;
+ if (p.type === "camera") return `${t}  #${p.sequence_number}  camera        ${p.filename} ${p.width}x${p.height}`;
+ if (p.type === "session_start") return `${t}  SESSION ${p.session_id} — ${p.device_model} (Android ${p.android_version})`;
+ return `${t}  ${p.type}`;
+}
+
+/* ---------- charts ------------------------------------------------------- */
+
+/* A chart that scales purely to what it can see turns a resting sensor into a storm: the
+   gyroscope idles around 0.0005 rad/s, and normalising to that stretches pure noise across
+   the full height. Shaking the phone then raised the peak and the same noise went flat, which
+   is exactly backwards. Each chart now has a floor it will not zoom past, and the axis eases
+   between values so it does not jump on every frame. */
+const MIN_SCALE = {chartA: 2.0, chartG: 0.5};   // m/s2 and rad/s
+const axisScale = {};
+
+function drawChart(canvas, streams, colors) {
+ const dpr = window.devicePixelRatio || 1;
+ const w = canvas.clientWidth, h = canvas.clientHeight;
+ if (!w || !h) return;
+ if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+  canvas.width = w * dpr; canvas.height = h * dpr;
+ }
+ const c = canvas.getContext("2d");
+ c.setTransform(dpr, 0, 0, dpr, 0, 0);
+ c.clearRect(0, 0, w, h);
+
+ const floor = MIN_SCALE[canvas.id] || 1;
+ let observed = 0;
+ for (const s of streams) for (const v of s) { const a = Math.abs(v); if (a > observed) observed = a; }
+ const target = Math.max(observed * 1.15, floor);
+ // Rise quickly so a real jolt is never clipped; fall slowly so the axis does not flicker.
+ const previous = axisScale[canvas.id] ?? floor;
+ const peak = previous + (target - previous) * (target > previous ? 0.4 : 0.04);
+ axisScale[canvas.id] = peak;
+
+ c.strokeStyle = "#1d2942"; c.lineWidth = 1;
+ for (let i = 0; i <= 4; i++) {
+  const y = h * i / 4;
+  c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke();
+ }
+ c.strokeStyle = "#2b3b5c";
+ c.beginPath(); c.moveTo(0, h / 2); c.lineTo(w, h / 2); c.stroke();
+
+ streams.forEach((s, i) => {
+  if (s.length < 2) return;
+  c.strokeStyle = colors[i]; c.lineWidth = 1.6; c.beginPath();
+  for (let k = 0; k < s.length; k++) {
+   const x = k / (CAP - 1) * w;
+   const y = h / 2 - (s[k] / peak) * (h / 2 - 6);
+   k ? c.lineTo(x, y) : c.moveTo(x, y);
+  }
+  c.stroke();
+ });
+
+ c.fillStyle = "#8fa3c4"; c.font = "11px ui-monospace,Consolas,monospace";
+ c.fillText("±" + peak.toFixed(2) + (observed < floor * 0.5 ? "  (at rest)" : ""), 8, 14);
+}
+
+function paint() {
+ const css = getComputedStyle(document.documentElement);
+ const colors = [css.getPropertyValue("--x").trim(), css.getPropertyValue("--y").trim(), css.getPropertyValue("--z").trim()];
+ drawChart($("chartA"), [series.accel.x, series.accel.y, series.accel.z], colors);
+ drawChart($("chartG"), [series.gyro.x, series.gyro.y, series.gyro.z], colors);
+ requestAnimationFrame(paint);
+}
+requestAnimationFrame(paint);
+
+/* Rate and freshness run on a timer, not on rAF: a background tab stops animating and
+   the rate would read 0.0 Hz while packets were still pouring in. */
+function tick() {
+ const now = Date.now();
+ recent = recent.filter(t => now - t < 2000);
+ $("rate").textContent = (recent.length / 2).toFixed(1) + " Hz";
+ if (lastPacketAt) {
+  const gap = (now - lastPacketAt) / 1000;
+  $("age").textContent = gap < 1 ? "just now" : gap.toFixed(1) + "s ago";
+  setDot($("dotDevice"), gap < 3 ? "live" : "wait");
+ }
+}
+setInterval(tick, 400);
+
+/* ---------- socket ------------------------------------------------------- */
+
+function connect() {
+ const proto = location.protocol === "https:" ? "wss:" : "ws:";
+ socket = new WebSocket(`${proto}//${location.host}/ws/dashboard`);
+
+ socket.onopen = () => {
+  backoff = 1;
+  $("server").textContent = "connected";
+  setDot($("dotServer"), "live");
+ };
+
+ socket.onmessage = ev => {
+  const msg = JSON.parse(ev.data);
+
+  if (msg.type === "hello") {
+   counts = Object.assign(counts, msg.stats || {});
+   renderCounts();
+   $("device").textContent = msg.devices ? `${msg.devices} connected` : "none";
+   if (msg.last_packet) setSession(msg.last_packet.session_id);
+   showFrame(msg.frame);
+   // Newest last on the wire, but the gallery reads newest first.
+   (msg.events || []).forEach(e => addEvent(e, true));
+   return;
+  }
+
+  if (msg.type === "camera_frame") {
+   showFrame(msg);
+   if (String(msg.trigger || "").startsWith("shock")) addEvent(msg, true);
+   return;
+  }
+
+  if (msg.type !== "live_packet") return;
+
+  const p = msg.packet;
+  counts = Object.assign(counts, msg.stats || {});
+  lastPacketAt = Date.now();
+  recent.push(lastPacketAt);
+
+  setSession(p.session_id);
+
+  if (p.type === "sensor" && p.sensor === "accelerometer") renderAccel(p.data);
+  else if (p.type === "sensor" && p.sensor === "gyroscope") renderGyro(p.data);
+  else if (p.type === "gps") { renderGps(p.data); logLine(describe(p)); }
+  else if (p.type === "session_start") { $("device").textContent = p.device_model || p.device_id; logLine(describe(p)); }
+  else logLine(describe(p));
+
+  // The sensor streams are far too fast to log every line; one in twenty stays readable.
+  if (p.type === "sensor" && counts.packets % 20 === 0) logLine(describe(p));
+
+  renderCounts();
+ };
+
+ socket.onclose = () => {
+  $("server").textContent = `reconnecting in ${backoff}s`;
+  setDot($("dotServer"), "");
+  setDot($("dotDevice"), "");
+  setTimeout(connect, backoff * 1000);
+  backoff = Math.min(backoff * 2, 15);
+ };
+
+ socket.onerror = () => socket.close();
+}
+connect();
+</script>
+</body>
+</html>

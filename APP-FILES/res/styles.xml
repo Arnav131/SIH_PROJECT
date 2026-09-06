@@ -1,0 +1,10 @@
+<resources>
+ <!-- MainActivity extends AppCompatActivity, which refuses to inflate under a
+      platform Material theme and crashed the app on launch. -->
+ <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+  <item name="colorAccent">#00796B</item>
+  <item name="colorPrimary">#00796B</item>
+  <item name="colorPrimaryDark">#004D40</item>
+  <item name="android:navigationBarColor">#ffffff</item>
+ </style>
+</resources>
